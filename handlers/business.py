@@ -37,14 +37,11 @@ def _display_name(message: Message) -> str:
 
 @router.business_connection()
 async def on_business_connection(connection: BusinessConnection, bot: Bot) -> None:
-    rights = connection.rights
-    can_reply = bool(rights and rights.can_reply)
-
     await db.upsert_business_connection(
         connection_id=connection.id,
         owner_id=connection.user.id,
         is_enabled=connection.is_enabled,
-        can_reply=can_reply,
+        can_reply=connection.can_reply,
     )
 
     status = "подключено ✅" if connection.is_enabled else "отключено ⛔"

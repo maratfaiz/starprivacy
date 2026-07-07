@@ -6,6 +6,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from sqlalchemy import func, select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 import config
@@ -43,8 +44,14 @@ async def get_or_create_user(
                 is_admin=telegram_id in config.ADMIN_IDS,
             )
             session.add(user)
-            await session.commit()
-            await session.refresh(user)
+            try:
+                await session.commit()
+            except IntegrityError:
+                # Lost a race with a concurrent update creating the same user - use theirs.
+                await session.rollback()
+                user = await session.get(User, telegram_id)
+            else:
+                await session.refresh(user)
         elif username != user.username or first_name != user.first_name:
             user.username = username
             user.first_name = first_name
@@ -108,10 +115,21 @@ async def upsert_business_connection(
                 can_reply=can_reply,
             )
             session.add(conn)
+            try:
+                await session.commit()
+            except IntegrityError:
+                # Lost a race with a concurrent business_connection update for the same id.
+                await session.rollback()
+                conn = await session.scalar(
+                    select(BusinessConnection).where(BusinessConnection.connection_id == connection_id)
+                )
+                conn.is_enabled = is_enabled
+                conn.can_reply = can_reply
+                await session.commit()
         else:
             conn.is_enabled = is_enabled
             conn.can_reply = can_reply
-        await session.commit()
+            await session.commit()
         await session.refresh(conn)
         return conn
 
