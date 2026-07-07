@@ -21,10 +21,15 @@ logger = logging.getLogger(__name__)
 STATIC_DIR = Path(__file__).parent / "static"
 
 
+async def _index(request: web.Request) -> web.FileResponse:
+    return web.FileResponse(STATIC_DIR / "index.html")
+
+
 def build_web_app(bot: Bot) -> web.Application:
     app = web.Application(middlewares=[auth_middleware])
     app["bot"] = bot
     app.add_routes(routes)
+    app.router.add_get("/", _index)
     app.router.add_static("/", STATIC_DIR, show_index=False, name="static")
     return app
 

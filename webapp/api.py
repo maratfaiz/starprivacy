@@ -61,6 +61,18 @@ def _serialize_message(msg) -> dict:
     }
 
 
+_TIER_TITLES = {"admin": "Администратор", "trial": "Пробный период"}
+
+
+def _tier_title(tier: str | None) -> str | None:
+    if tier is None:
+        return None
+    if tier in _TIER_TITLES:
+        return _TIER_TITLES[tier]
+    tariff = config.TARIFFS.get(tier)
+    return tariff.title if tariff else tier
+
+
 @routes.get("/api/me")
 async def get_me(request: web.Request) -> web.Response:
     user_id = request["tg_user_id"]
@@ -72,6 +84,7 @@ async def get_me(request: web.Request) -> web.Response:
             "user_id": user_id,
             "is_admin": user_id in config.ADMIN_IDS,
             "tier": access.tier,
+            "tier_title": _tier_title(access.tier),
             "allowed": access.allowed,
             "max_stored_days": access.max_stored_days,
             "expires_at": sub.expires_at.isoformat() if sub and sub.expires_at else None,

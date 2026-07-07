@@ -109,8 +109,7 @@
   function buildStatusCard(me) {
     let tierLabel = "не активен";
     if (me.tier === "admin") tierLabel = "администратор (бесплатно навсегда)";
-    else if (me.tier === "trial") tierLabel = "пробный период";
-    else if (me.tier) tierLabel = me.tier;
+    else if (me.tier_title) tierLabel = me.tier_title;
 
     const retention = me.max_stored_days == null ? "без ограничений" : me.max_stored_days + " дней";
     const expiry = me.expires_at ? "Действует до " + fmtDate(me.expires_at) + " UTC" : "";
