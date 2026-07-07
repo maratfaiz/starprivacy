@@ -45,6 +45,10 @@ the privacy/legal disclaimer that must stay in sync with actual behavior.
 - `middlewares/access.py` — resolves whether a business owner currently has usable access
   (admin override vs. active paid subscription vs. none).
 - `utils/media.py` — downloads/caches media (photo/video/voice/document) referenced by a message.
+- `webapp/` — the Telegram Mini App: `server.py` builds/runs the aiohttp app (started as a background
+  task in `main.py`, alongside bot polling), `auth.py` validates Telegram's signed `initData`,
+  `api.py` is the JSON API (status/tariffs/subscribe/connections/chats/messages/media), and
+  `static/` is a plain HTML/CSS/JS frontend (no build step, no framework).
 
 ## Key conventions
 
@@ -58,6 +62,9 @@ the privacy/legal disclaimer that must stay in sync with actual behavior.
 - The trial tariff (`config.TRIAL_TARIFF`) is intentionally excluded from `config.TARIFFS` (the
   purchasable plans shown in `/subscribe`) — it's granted programmatically once per user, never
   bought.
+- Every Mini App API route must go through `webapp.auth.validate_init_data` (enforced globally by
+  `webapp.api.auth_middleware`) and re-check that the requested connection/chat/message belongs to
+  the authenticated Telegram user — admin status never grants visibility into another user's data.
 - Secrets (bot token, DB credentials) come from environment variables only — never hardcode them.
   The one intentional exception is `config.LIFETIME_FREE_ADMIN_ID`, which is a product decision,
   not a secret.

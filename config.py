@@ -41,6 +41,12 @@ DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./data/starpr
 MEDIA_STORAGE_PATH: str = os.getenv("MEDIA_STORAGE_PATH", "./data/media")
 LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
 
+# Mini App web server. Bind host/port are what the process listens on locally;
+# a reverse proxy (nginx/Caddy) in front of it is expected to terminate TLS,
+# since Telegram requires Mini App URLs to be HTTPS.
+WEBAPP_HOST: str = os.getenv("WEBAPP_HOST", "127.0.0.1")
+WEBAPP_PORT: int = int(os.getenv("WEBAPP_PORT", "8080"))
+
 # The Telegram user ID that always gets the full feature set for free, forever.
 # This is a product decision (project owner / permanent admin), not a secret.
 LIFETIME_FREE_ADMIN_ID: int = 1283428247

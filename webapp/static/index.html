@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>StarPrivacyBot</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+  <div id="app">
+    <nav class="tabs">
+      <button class="tab-button" data-tab="dashboard">Статус</button>
+      <button class="tab-button" data-tab="archive">Архив</button>
+    </nav>
+
+    <section id="tab-dashboard" class="tab-panel"></section>
+    <section id="tab-archive" class="tab-panel" hidden></section>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

@@ -100,8 +100,13 @@ starprivacy/
 │   └── admin.py               # /stats (admin only)
 ├── middlewares/
 │   └── access.py              # subscription/access-level resolution
-└── utils/
-    └── media.py                # media download/caching helpers
+├── utils/
+│   └── media.py                # media download/caching helpers
+└── webapp/                    # Mini App: dashboard + archive browser
+    ├── server.py                # aiohttp app factory, runs alongside polling
+    ├── auth.py                  # Telegram `initData` HMAC validation
+    ├── api.py                   # JSON API (status, tariffs, chats, messages, media)
+    └── static/                  # vanilla HTML/CSS/JS frontend (no build step)
 ```
 
 ## Requirements
@@ -192,8 +197,42 @@ These steps assume a fresh Ubuntu/Debian VPS and a non-root deploy user.
 5. **Back up `data/`** (SQLite file and cached media) regularly if you rely
    on the default SQLite setup — it holds all archived content.
 
-The bot uses long polling by default, so no inbound port, reverse proxy or
-TLS certificate is required on the VPS.
+The bot itself uses long polling, so it needs no inbound port. The **Mini App**
+does, though — see the next section.
+
+## Mini App (dashboard + archive browser)
+
+The bot also serves a Telegram [Mini App](https://core.telegram.org/bots/webapps):
+a small web dashboard showing your subscription/trial status and tariffs to
+buy, plus an archive browser to page through saved chats and see edit/delete
+history and cached media — all from inside Telegram.
+
+It runs as an aiohttp server (`webapp/server.py`) inside the same process as
+the bot, listening on `WEBAPP_HOST:WEBAPP_PORT` (default `127.0.0.1:8080`,
+i.e. not exposed publicly by itself).
+
+**Telegram requires Mini App URLs to be HTTPS on a public domain**, so you
+need a reverse proxy in front of it. The simplest option on a VPS is
+[Caddy](https://caddyserver.com/), which handles Let's Encrypt automatically:
+
+```bash
+sudo apt install -y caddy
+# /etc/caddy/Caddyfile
+# yourdomain.example {
+#     reverse_proxy 127.0.0.1:8080
+# }
+sudo systemctl reload caddy
+```
+
+Then register the URL with BotFather: `/mybots` → select your bot → **Bot
+Settings** → **Configure Mini App** (or **Menu Button**) → set it to
+`https://yourdomain.example`.
+
+Every API request is authenticated using Telegram's signed `initData`
+(`webapp/auth.py` validates the HMAC per Telegram's documented algorithm) —
+there are no separate accounts or passwords, and a user can only ever see
+their own connections/chats/messages, never anyone else's, regardless of
+admin status.
 
 ## Subscriptions & Telegram Stars
 

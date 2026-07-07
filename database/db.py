@@ -193,6 +193,84 @@ async def save_message(**fields) -> SavedMessage:
         return msg
 
 
+async def get_saved_message_by_id(row_id: int) -> SavedMessage | None:
+    async with get_session() as session:
+        return await session.get(SavedMessage, row_id)
+
+
+async def get_chats_for_connection(connection_id: str) -> list[dict]:
+    """Per-chat summary (last message + counters) for the archive browser."""
+    async with get_session() as session:
+        chat_ids = list(
+            await session.scalars(
+                select(SavedMessage.chat_id)
+                .where(SavedMessage.connection_id == connection_id)
+                .distinct()
+            )
+        )
+
+        summaries: list[dict] = []
+        for chat_id in chat_ids:
+            base = select(SavedMessage).where(
+                SavedMessage.connection_id == connection_id, SavedMessage.chat_id == chat_id
+            )
+            last_message = await session.scalar(base.order_by(SavedMessage.sent_at.desc()))
+            total = await session.scalar(
+                select(func.count()).select_from(SavedMessage).where(
+                    SavedMessage.connection_id == connection_id, SavedMessage.chat_id == chat_id
+                )
+            )
+            edited = await session.scalar(
+                select(func.count()).select_from(SavedMessage).where(
+                    SavedMessage.connection_id == connection_id,
+                    SavedMessage.chat_id == chat_id,
+                    SavedMessage.is_edited.is_(True),
+                )
+            )
+            deleted = await session.scalar(
+                select(func.count()).select_from(SavedMessage).where(
+                    SavedMessage.connection_id == connection_id,
+                    SavedMessage.chat_id == chat_id,
+                    SavedMessage.is_deleted.is_(True),
+                )
+            )
+            summaries.append(
+                {
+                    "chat_id": chat_id,
+                    "sender_name": last_message.sender_name if last_message else None,
+                    "last_message_preview": (last_message.text or last_message.caption or f"[{last_message.content_type}]")
+                    if last_message
+                    else None,
+                    "last_sent_at": last_message.sent_at if last_message else None,
+                    "total_messages": total or 0,
+                    "edited_count": edited or 0,
+                    "deleted_count": deleted or 0,
+                }
+            )
+
+        summaries.sort(key=lambda row: row["last_sent_at"] or dt.datetime.min.replace(tzinfo=dt.timezone.utc), reverse=True)
+        return summaries
+
+
+async def get_messages_for_chat(
+    connection_id: str, chat_id: int, before_id: int | None = None, limit: int = 50
+) -> list[SavedMessage]:
+    """Latest `limit` messages in a chat, ordered oldest-to-newest for display.
+
+    Pass `before_id` (the smallest `id` already loaded) to page further back.
+    """
+    async with get_session() as session:
+        query = select(SavedMessage).where(
+            SavedMessage.connection_id == connection_id, SavedMessage.chat_id == chat_id
+        )
+        if before_id is not None:
+            query = query.where(SavedMessage.id < before_id)
+        query = query.order_by(SavedMessage.id.desc()).limit(limit)
+        rows = list(await session.scalars(query))
+        rows.reverse()
+        return rows
+
+
 async def get_message(connection_id: str, chat_id: int, message_id: int) -> SavedMessage | None:
     async with get_session() as session:
         return await session.scalar(
