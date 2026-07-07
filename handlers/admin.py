@@ -18,9 +18,9 @@ async def cmd_stats(message: Message) -> None:
 
     stats = await db.get_stats()
     await message.answer(
-        "<b>StarPrivacyBot stats</b>\n"
-        f"Users: {stats['users']}\n"
-        f"Business connections: {stats['active_connections']} active / {stats['connections']} total\n"
-        f"Active subscriptions: {stats['active_subscriptions']}\n"
-        f"Saved messages: {stats['messages']}"
+        "<b>Статистика StarPrivacyBot</b>\n"
+        f"Пользователей: {stats['users']}\n"
+        f"Бизнес-подключений: {stats['active_connections']} активно из {stats['connections']}\n"
+        f"Активных подписок: {stats['active_subscriptions']}\n"
+        f"Сохранённых сообщений: {stats['messages']}"
     )

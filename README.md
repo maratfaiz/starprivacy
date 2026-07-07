@@ -53,10 +53,15 @@ Telegram's own in-app settings.
 - **Subscriptions via Telegram Stars** — Basic and Premium monthly plans,
   paid with native Telegram Stars (`XTR`), no external payment provider
   needed.
+- **2-day free trial** — every new user gets a one-time, no-payment trial
+  (unlimited history retention) automatically granted on their first
+  `/start`, so they can try the bot before subscribing.
 - **Lifetime free admin** — Telegram user ID `1283428247` always has full,
   unmetered access; other admins can be added via `EXTRA_ADMIN_IDS`.
 - **SQLite by default, PostgreSQL-ready** — swap `DATABASE_URL` to move from
   a single-VPS SQLite file to Postgres, no code changes required.
+- **Russian-language UI** — all bot-facing text (commands, alerts, invoices)
+  is in Russian; this codebase and its comments remain in English.
 
 ## How the Business API integration works
 
@@ -198,9 +203,14 @@ TLS certificate is required on the VPS.
 - Plans and prices are defined in `config.py::TARIFFS`:
   - **Basic** — 100⭐/month, 14 days of message history retention.
   - **Premium** — 250⭐/month, unlimited history retention.
+- Every new user gets a one-time **2-day free trial** (`config.py::TRIAL_TARIFF`),
+  auto-granted on their first `/start` via `database.db.grant_trial_if_eligible`
+  — no payment, no manual action, and it can't be re-triggered once used
+  (tracked by `User.trial_used`).
 - Telegram user ID `1283428247` bypasses subscriptions entirely (permanent
   free admin access) — see `config.py::LIFETIME_FREE_ADMIN_ID`.
-- `/status` shows the caller's current plan and connection state.
+- `/status` shows the caller's current plan, trial/subscription expiry, and
+  connection state.
 
 ## Disclaimer
 

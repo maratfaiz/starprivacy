@@ -67,27 +67,38 @@ class Tariff:
 TARIFFS: dict[str, Tariff] = {
     "basic": Tariff(
         key="basic",
-        title="Basic",
+        title="Базовый",
         stars_price=100,
         duration_days=30,
         max_stored_days=14,
         description=(
-            "Archives text + media from your connected Business chats, "
-            "edit/delete alerts, 14 days of history."
+            "Архивирование текста и медиа из подключённых бизнес-чатов, "
+            "уведомления об изменении/удалении сообщений, история за 14 дней."
         ),
     ),
     "premium": Tariff(
         key="premium",
-        title="Premium",
+        title="Премиум",
         stars_price=250,
         duration_days=30,
         max_stored_days=None,
         description=(
-            "Everything in Basic plus unlimited history retention and "
-            "priority media downloads."
+            "Всё из тарифа «Базовый» плюс неограниченная история "
+            "и приоритетная загрузка медиафайлов."
         ),
     ),
 }
+
+# A one-time, non-purchasable trial tier automatically granted on first /start
+# (see database.db.grant_trial_if_eligible). Not shown in the /subscribe menu.
+TRIAL_TARIFF = Tariff(
+    key="trial",
+    title="Пробный период",
+    stars_price=0,
+    duration_days=2,
+    max_stored_days=None,
+    description="Бесплатный доступ на 2 дня, чтобы попробовать все возможности бота.",
+)
 
 
 def setup_logging() -> None:

@@ -1,4 +1,4 @@
-"""General bot commands: /start, /help, /status."""
+"""Общие команды бота: /start, /help, /status."""
 from __future__ import annotations
 
 from aiogram import Router
@@ -13,34 +13,42 @@ router = Router(name="commands")
 
 WELCOME_TEXT = (
     "👋 <b>StarPrivacyBot</b>\n\n"
-    "This bot connects to your Telegram <b>Business account</b> and keeps a private "
-    "backup of messages sent to you, so you can still see them if the sender "
-    "edits or deletes them.\n\n"
-    "<b>How to connect:</b>\n"
-    "1. Telegram Settings → Business → Chatbots\n"
-    "2. Choose this bot and enable it for the chats you want\n"
-    "3. Send /subscribe to activate a plan (nothing is recorded before you do)\n\n"
-    "⚠️ <b>Privacy notice:</b> only enable this for chats where you have the "
-    "right to keep records of the conversation. See the project README for "
-    "the full disclaimer.\n\n"
-    "Commands: /help /status /subscribe"
+    "Этот бот подключается к вашему <b>Telegram Business</b>-аккаунту и делает "
+    "приватную копию сообщений, которые вам присылают, — так вы сможете увидеть "
+    "их, даже если отправитель отредактирует или удалит сообщение.\n\n"
+    "<b>Как подключить:</b>\n"
+    "1. Настройки Telegram → Бизнес → Чат-боты\n"
+    "2. Выберите этого бота и включите его для нужных чатов\n"
+    "3. Отправьте /subscribe, чтобы активировать тариф (до этого момента ничего не сохраняется)\n\n"
+    "⚠️ <b>Уведомление о приватности:</b> включайте бота только для тех чатов, "
+    "где у вас есть право хранить переписку. Подробности — в README проекта.\n\n"
+    "Команды: /help /status /subscribe"
 )
 
 HELP_TEXT = (
-    "<b>Commands</b>\n"
-    "/start — welcome message and setup instructions\n"
-    "/status — your subscription and business connection status\n"
-    "/subscribe — view plans and pay with Telegram Stars\n"
-    "/help — this message"
+    "<b>Команды</b>\n"
+    "/start — приветствие и инструкция по подключению\n"
+    "/status — ваш тариф и статус бизнес-подключения\n"
+    "/subscribe — тарифы и оплата через Telegram Stars\n"
+    "/help — это сообщение"
 )
 
 
 @router.message(Command("start"))
 async def cmd_start(message: Message) -> None:
-    await db.get_or_create_user(
+    user = await db.get_or_create_user(
         message.from_user.id, message.from_user.username, message.from_user.first_name
     )
     await message.answer(WELCOME_TEXT)
+
+    if user.telegram_id not in config.ADMIN_IDS:
+        trial = await db.grant_trial_if_eligible(user.telegram_id)
+        if trial is not None:
+            await message.answer(
+                f"🎁 Вам активирован бесплатный пробный период на "
+                f"{config.TRIAL_TARIFF.duration_days} дня — попробуйте все возможности бота.\n"
+                f"Действует до {trial.expires_at:%d.%m.%Y %H:%M} UTC."
+            )
 
 
 @router.message(Command("help"))
@@ -55,17 +63,24 @@ async def cmd_status(message: Message) -> None:
     connections = await db.get_connections_for_owner(user_id)
 
     if access.tier == "admin":
-        plan_line = "Plan: <b>Admin (lifetime free)</b>"
+        plan_line = "Тариф: <b>Администратор (бесплатно навсегда)</b>"
+    elif access.tier == "trial":
+        sub = await db.get_active_subscription(user_id)
+        until = f" до {sub.expires_at:%d.%m.%Y %H:%M} UTC" if sub and sub.expires_at else ""
+        plan_line = f"Тариф: <b>Пробный период</b>{until}"
     elif access.allowed:
-        retention = "unlimited" if access.max_stored_days is None else f"{access.max_stored_days} days"
-        plan_line = f"Plan: <b>{access.tier.title()}</b> (history retention: {retention})"
+        retention = "без ограничений" if access.max_stored_days is None else f"{access.max_stored_days} дней"
+        sub = await db.get_active_subscription(user_id)
+        until = f", действует до {sub.expires_at:%d.%m.%Y %H:%M} UTC" if sub and sub.expires_at else ""
+        tariff_title = config.TARIFFS[access.tier].title if access.tier in config.TARIFFS else access.tier
+        plan_line = f"Тариф: <b>{tariff_title}</b> (история: {retention}{until})"
     else:
-        plan_line = "Plan: <b>none</b> — use /subscribe to activate archiving"
+        plan_line = "Тариф: <b>не активен</b> — используйте /subscribe, чтобы включить архивирование"
 
     if connections:
         active = [c for c in connections if c.is_enabled]
-        conn_line = f"Business connections: {len(active)} active / {len(connections)} total"
+        conn_line = f"Бизнес-подключения: {len(active)} активно из {len(connections)}"
     else:
-        conn_line = "Business connections: none yet — connect this bot in Telegram Business settings"
+        conn_line = "Бизнес-подключения: пока нет — подключите бота в Настройках Telegram → Бизнес"
 
     await message.answer(f"{plan_line}\n{conn_line}")

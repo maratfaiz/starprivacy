@@ -30,6 +30,9 @@ async def get_access_level(user_id: int) -> AccessLevel:
     if sub is None:
         return AccessLevel(allowed=False, tier=None, max_stored_days=None)
 
+    if sub.tier == config.TRIAL_TARIFF.key:
+        return AccessLevel(allowed=True, tier="trial", max_stored_days=config.TRIAL_TARIFF.max_stored_days)
+
     tariff = config.TARIFFS.get(sub.tier)
     max_days = tariff.max_stored_days if tariff else None
     return AccessLevel(allowed=True, tier=sub.tier, max_stored_days=max_days)

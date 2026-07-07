@@ -53,6 +53,41 @@ async def get_or_create_user(
         return user
 
 
+async def grant_trial_if_eligible(user_id: int) -> Subscription | None:
+    """Grant the one-time free trial to a brand-new user, if they qualify.
+
+    Returns the created Subscription, or None if the user already used their
+    trial before or already has some other active subscription.
+    """
+    now = dt.datetime.now(dt.timezone.utc)
+    async with get_session() as session:
+        user = await session.get(User, user_id)
+        if user is None or user.trial_used:
+            return None
+
+        active = await session.scalar(
+            select(Subscription)
+            .where(Subscription.user_id == user_id)
+            .where((Subscription.expires_at.is_(None)) | (Subscription.expires_at > now))
+        )
+        if active is not None:
+            return None
+
+        sub = Subscription(
+            user_id=user_id,
+            tier=config.TRIAL_TARIFF.key,
+            is_lifetime=False,
+            started_at=now,
+            expires_at=now + dt.timedelta(days=config.TRIAL_TARIFF.duration_days),
+            stars_paid=0,
+        )
+        session.add(sub)
+        user.trial_used = True
+        await session.commit()
+        await session.refresh(sub)
+        return sub
+
+
 # --------------------------------------------------------------------------
 # Business connections
 # --------------------------------------------------------------------------

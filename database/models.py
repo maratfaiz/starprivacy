@@ -33,6 +33,7 @@ class User(Base):
     username: Mapped[str | None] = mapped_column(String(64), nullable=True)
     first_name: Mapped[str | None] = mapped_column(String(256), nullable=True)
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
+    trial_used: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
     business_connections: Mapped[list["BusinessConnection"]] = relationship(

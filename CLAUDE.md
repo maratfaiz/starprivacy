@@ -32,7 +32,7 @@ the privacy/legal disclaimer that must stay in sync with actual behavior.
 - `config.py` — all environment-driven configuration: bot token, database URL, media storage path,
   admin IDs (including the hardcoded lifetime-free admin), and subscription tariffs.
 - `database/models.py` — SQLAlchemy ORM models (`User`, `BusinessConnection`, `Subscription`,
-  `SavedMessage`).
+  `SavedMessage`). `User.trial_used` gates the one-time free trial.
 - `database/db.py` — async engine/session setup and all CRUD helper functions; handlers should go
   through this module rather than touching SQLAlchemy sessions directly.
 - `handlers/business.py` — the core feature: `business_connection`, `business_message`,
@@ -53,6 +53,11 @@ the privacy/legal disclaimer that must stay in sync with actual behavior.
   `middlewares/access.py` and be checked in `handlers/business.py`, not duplicated ad hoc.
 - Only *incoming* messages (sent to the business account) are archived; messages the business
   owner sends themselves must never be stored — see the `is_from_business_owner` checks.
+- All bot-facing strings (commands, alerts, invoices) are in Russian; keep new user-facing text
+  consistent with that. Code, comments, and docs stay in English.
+- The trial tariff (`config.TRIAL_TARIFF`) is intentionally excluded from `config.TARIFFS` (the
+  purchasable plans shown in `/subscribe`) — it's granted programmatically once per user, never
+  bought.
 - Secrets (bot token, DB credentials) come from environment variables only — never hardcode them.
   The one intentional exception is `config.LIFETIME_FREE_ADMIN_ID`, which is a product decision,
   not a secret.

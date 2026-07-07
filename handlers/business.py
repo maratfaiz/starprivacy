@@ -47,15 +47,16 @@ async def on_business_connection(connection: BusinessConnection, bot: Bot) -> No
         can_reply=can_reply,
     )
 
-    status = "connected ✅" if connection.is_enabled else "disconnected ⛔"
+    status = "подключено ✅" if connection.is_enabled else "отключено ⛔"
     try:
         await bot.send_message(
             connection.user.id,
-            f"Business connection {status}.\n"
+            f"Бизнес-подключение: {status}.\n"
             + (
-                "New incoming messages will now be archived. Use /status to check your plan."
+                "Новые входящие сообщения теперь будут архивироваться. "
+                "Проверить тариф — /status."
                 if connection.is_enabled
-                else "Archiving paused for this connection."
+                else "Архивирование для этого подключения приостановлено."
             ),
         )
     except Exception:
@@ -132,9 +133,9 @@ async def on_edited_business_message(message: Message, bot: Bot) -> None:
     await bot.send_message(
         connection.owner_id,
         (
-            f"✏️ <b>Message edited</b> ({original.sender_name}, {when:%Y-%m-%d %H:%M UTC})\n\n"
-            f"<b>Before:</b>\n{previous_text or '<i>[no text]</i>'}\n\n"
-            f"<b>After:</b>\n{new_text or '<i>[no text]</i>'}"
+            f"✏️ <b>Сообщение отредактировано</b> ({original.sender_name}, {when:%d.%m.%Y %H:%M} UTC)\n\n"
+            f"<b>Было:</b>\n{previous_text or '<i>[без текста]</i>'}\n\n"
+            f"<b>Стало:</b>\n{new_text or '<i>[без текста]</i>'}"
         ),
     )
 
@@ -153,9 +154,9 @@ async def on_deleted_business_messages(event: BusinessMessagesDeleted, bot: Bot)
         if msg.is_from_business_owner:
             continue  # Only alert about the customer's own messages disappearing.
 
-        body = msg.text or msg.caption or "<i>[no text]</i>"
+        body = msg.text or msg.caption or "<i>[без текста]</i>"
         header = (
-            f"🗑️ <b>Message deleted</b> ({msg.sender_name}, sent {msg.sent_at:%Y-%m-%d %H:%M UTC})"
+            f"🗑️ <b>Сообщение удалено</b> ({msg.sender_name}, отправлено {msg.sent_at:%d.%m.%Y %H:%M} UTC)"
         )
         try:
             if msg.media_local_path and msg.content_type == "photo":

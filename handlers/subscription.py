@@ -1,4 +1,4 @@
-"""Telegram Stars subscription flow (/subscribe, invoices, payments)."""
+"""Оплата подписки через Telegram Stars (/subscribe, инвойсы, платежи)."""
 from __future__ import annotations
 
 import logging
@@ -25,7 +25,7 @@ def _plans_keyboard() -> InlineKeyboardMarkup:
     buttons = [
         [
             InlineKeyboardButton(
-                text=f"{tariff.title} — {tariff.stars_price}⭐/month",
+                text=f"{tariff.title} — {tariff.stars_price}⭐/мес",
                 callback_data=f"sub:{tariff.key}",
             )
         ]
@@ -38,11 +38,11 @@ def _plans_keyboard() -> InlineKeyboardMarkup:
 async def cmd_subscribe(message: Message) -> None:
     if message.from_user.id in config.ADMIN_IDS:
         await message.answer(
-            "You already have permanent free admin access — nothing to buy. 🎉"
+            "У вас уже есть бесплатный доступ администратора — покупать ничего не нужно. 🎉"
         )
         return
 
-    lines = ["<b>Choose a plan</b> (billed monthly in Telegram Stars):\n"]
+    lines = ["<b>Выберите тариф</b> (оплата ежемесячно, в Telegram Stars):\n"]
     for tariff in config.TARIFFS.values():
         lines.append(f"• <b>{tariff.title}</b> — {tariff.stars_price}⭐\n  {tariff.description}")
     await message.answer("\n".join(lines), reply_markup=_plans_keyboard())
@@ -53,15 +53,15 @@ async def on_plan_chosen(callback: CallbackQuery) -> None:
     tariff_key = callback.data.split(":", 1)[1]
     tariff = config.TARIFFS.get(tariff_key)
     if tariff is None:
-        await callback.answer("Unknown plan.", show_alert=True)
+        await callback.answer("Тариф не найден.", show_alert=True)
         return
 
     await callback.message.answer_invoice(
-        title=f"StarPrivacyBot — {tariff.title} plan",
+        title=f"StarPrivacyBot — тариф «{tariff.title}»",
         description=tariff.description,
         payload=f"subscription:{tariff.key}",
         currency=config.STARS_CURRENCY,
-        prices=[LabeledPrice(label=f"{tariff.title} (30 days)", amount=tariff.stars_price)],
+        prices=[LabeledPrice(label=f"{tariff.title} (30 дней)", amount=tariff.stars_price)],
     )
     await callback.answer()
 
@@ -71,7 +71,7 @@ async def on_pre_checkout(pre_checkout_query: PreCheckoutQuery) -> None:
     payload = pre_checkout_query.invoice_payload
     tariff_key = payload.split(":", 1)[1] if payload.startswith("subscription:") else None
     if tariff_key not in config.TARIFFS:
-        await pre_checkout_query.answer(ok=False, error_message="This plan is no longer available.")
+        await pre_checkout_query.answer(ok=False, error_message="Этот тариф больше недоступен.")
         return
     await pre_checkout_query.answer(ok=True)
 
@@ -97,6 +97,6 @@ async def on_successful_payment(message: Message) -> None:
         telegram_payment_charge_id=payment.telegram_payment_charge_id,
     )
     await message.answer(
-        f"✅ <b>{tariff.title}</b> plan activated for {tariff.duration_days} days.\n"
-        "Now enable this bot for a chat in Telegram Business settings to start archiving."
+        f"✅ Тариф «<b>{tariff.title}</b>» активирован на {tariff.duration_days} дней.\n"
+        "Теперь подключите бота в разделе Настройки Telegram → Бизнес, чтобы начать архивирование."
     )
