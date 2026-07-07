@@ -205,7 +205,9 @@ does, though — see the next section.
 The bot also serves a Telegram [Mini App](https://core.telegram.org/bots/webapps):
 a small web dashboard showing your subscription/trial status and tariffs to
 buy, plus an archive browser to page through saved chats and see edit/delete
-history and cached media — all from inside Telegram.
+history and cached media — all from inside Telegram. The UI is a dark,
+gold-accented premium theme (Manrope/Inter, bottom sheets, a status hero
+card) defined entirely in `webapp/static/`.
 
 It runs as an aiohttp server (`webapp/server.py`) inside the same process as
 the bot, listening on `WEBAPP_HOST:WEBAPP_PORT` (default `127.0.0.1:8080`,

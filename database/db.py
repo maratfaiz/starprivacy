@@ -133,6 +133,32 @@ async def get_connections_for_owner(owner_id: int) -> list[BusinessConnection]:
         return list(result)
 
 
+async def get_owner_archive_stats(owner_id: int) -> dict[str, int]:
+    """Aggregate archive counters across all of an owner's connections, for the dashboard."""
+    async with get_session() as session:
+        base = (
+            select(SavedMessage)
+            .join(BusinessConnection, SavedMessage.connection_id == BusinessConnection.connection_id)
+            .where(BusinessConnection.owner_id == owner_id)
+        )
+        total_messages = await session.scalar(select(func.count()).select_from(base.subquery()))
+        total_chats = await session.scalar(
+            select(func.count(func.distinct(SavedMessage.chat_id)))
+            .select_from(SavedMessage)
+            .join(BusinessConnection, SavedMessage.connection_id == BusinessConnection.connection_id)
+            .where(BusinessConnection.owner_id == owner_id)
+        )
+        saved_originals = await session.scalar(
+            select(func.count())
+            .select_from(base.where((SavedMessage.is_edited.is_(True)) | (SavedMessage.is_deleted.is_(True))).subquery())
+        )
+        return {
+            "total_messages": total_messages or 0,
+            "total_chats": total_chats or 0,
+            "saved_originals": saved_originals or 0,
+        }
+
+
 # --------------------------------------------------------------------------
 # Subscriptions
 # --------------------------------------------------------------------------

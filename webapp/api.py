@@ -73,12 +73,20 @@ def _tier_title(tier: str | None) -> str | None:
     return tariff.title if tariff else tier
 
 
+def _tier_duration_days(tier: str | None) -> int | None:
+    if tier == config.TRIAL_TARIFF.key:
+        return config.TRIAL_TARIFF.duration_days
+    tariff = config.TARIFFS.get(tier or "")
+    return tariff.duration_days if tariff else None
+
+
 @routes.get("/api/me")
 async def get_me(request: web.Request) -> web.Response:
     user_id = request["tg_user_id"]
     access = await get_access_level(user_id)
     sub = await db.get_active_subscription(user_id) if access.allowed and access.tier != "admin" else None
     connections = await db.get_connections_for_owner(user_id)
+    archive_stats = await db.get_owner_archive_stats(user_id)
     return web.json_response(
         {
             "user_id": user_id,
@@ -87,11 +95,14 @@ async def get_me(request: web.Request) -> web.Response:
             "tier_title": _tier_title(access.tier),
             "allowed": access.allowed,
             "max_stored_days": access.max_stored_days,
+            "started_at": sub.started_at.isoformat() if sub and sub.started_at else None,
             "expires_at": sub.expires_at.isoformat() if sub and sub.expires_at else None,
+            "duration_days": _tier_duration_days(access.tier),
             "connections": [
                 {"connection_id": c.connection_id, "is_enabled": c.is_enabled, "can_reply": c.can_reply}
                 for c in connections
             ],
+            "archive_stats": archive_stats,
         }
     )
 
