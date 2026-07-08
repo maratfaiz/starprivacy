@@ -133,6 +133,39 @@ On first connection, in Telegram: **Settings → Business → Chatbots →
 Add bot** and paste your bot's username, then choose which chats it should
 be active in.
 
+## Running it without your own computer (Railway)
+
+The bot needs *some* machine online 24/7 - it doesn't have to be yours. The
+quickest way to get one without touching a terminal is a PaaS like
+[Railway](https://railway.app) (Render.com works the same way):
+
+1. Push this repo to your own GitHub account if you haven't already (or use
+   `maratfaiz/starprivacy` directly if Railway has access to it).
+2. On [railway.app](https://railway.app), sign in, **New Project → Deploy
+   from GitHub repo**, and pick this repository/branch. Railway detects
+   `requirements.txt` and the `Procfile` automatically and starts building.
+3. Add persistent storage: in the service, **New → Volume**, mount it at
+   `/data`. Without this, the SQLite database and cached media are wiped on
+   every redeploy.
+4. Open the service's **Variables** tab and add:
+   - `BOT_TOKEN` = your token from @BotFather
+   - `DATABASE_URL` = `sqlite+aiosqlite:////data/starprivacy.db`
+   - `MEDIA_STORAGE_PATH` = `/data/media`
+
+   Leave `WEBAPP_HOST`/`WEBAPP_PORT`/`PORT` unset - Railway injects `PORT`
+   itself and the app already binds to `0.0.0.0`.
+5. Under **Settings → Networking**, click **Generate Domain**. Railway gives
+   you a public `https://....up.railway.app` URL with TLS already handled -
+   no ngrok, no Caddy, no reverse proxy to configure yourself.
+6. Register that URL with BotFather: `/mybots` → select your bot → **Bot
+   Settings** → **Configure Mini App** (or **Menu Button**) → paste it.
+7. Message your bot, send `/start`, then connect it in Telegram: **Settings
+   → Business → Chatbots → Add bot**.
+
+Cost is typically covered by Railway's free trial credit initially, then a
+few dollars a month on its Hobby plan for an always-on service plus a small
+volume.
+
 ## Deploying to a VPS
 
 These steps assume a fresh Ubuntu/Debian VPS and a non-root deploy user.
