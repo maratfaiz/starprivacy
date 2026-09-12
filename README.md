@@ -39,9 +39,14 @@ Telegram's own in-app settings.
 
 ## Features
 
-- **Message archiving** — text, photos, videos, voice notes and documents
-  sent *to* a connected Business account are copied (metadata + a local copy
-  of the media file) as soon as they arrive.
+- **Persistent menu** — after `/start`, a reply-keyboard menu (Профиль /
+  Подписка / Подключения / Помощь) stays under the input box; each button
+  mirrors a slash command (`/status`, `/subscribe`, `/help`) and a native
+  `/menu` command re-summons the keyboard if a client hides it.
+- **Message archiving** — text, photos, videos, voice notes, documents,
+  locations, venues, contacts, polls and dice sent *to* a connected Business
+  account are copied (metadata + a local copy of the media file, where one
+  exists) as soon as they arrive.
 - **Edit alerts** — if an archived message is edited, the owner gets a
   private message from the bot showing the original text, the new text, and
   the time of the edit.
@@ -54,8 +59,10 @@ Telegram's own in-app settings.
   paid with native Telegram Stars (`XTR`), no external payment provider
   needed.
 - **2-day free trial** — every new user gets a one-time, no-payment trial
-  (unlimited history retention) automatically granted on their first
-  `/start`, so they can try the bot before subscribing.
+  (unlimited history retention), automatically granted either on their
+  first `/start` or as soon as they connect the bot via Telegram Settings →
+  Business → Chatbots (whichever happens first) — archiving works either
+  way, without requiring the owner to message the bot separately.
 - **Lifetime free admin** — Telegram user ID `1283428247` always has full,
   unmetered access; other admins can be added via `EXTRA_ADMIN_IDS`.
 - **SQLite by default, PostgreSQL-ready** — swap `DATABASE_URL` to move from
@@ -93,10 +100,12 @@ starprivacy/
 ├── database/
 │   ├── models.py             # SQLAlchemy ORM models
 │   └── db.py                 # async engine/session + CRUD helpers
+├── keyboards.py                # reply-keyboard main menu (button labels + layout)
 ├── handlers/
 │   ├── business.py           # business_connection / message / edit / delete
 │   ├── subscription.py       # /subscribe, Stars invoices & payments
-│   ├── commands.py           # /start /help /status
+│   ├── commands.py           # /start /menu /help /status
+│   ├── menu.py                 # reply-keyboard button handlers (mirror the commands above)
 │   └── admin.py               # /stats (admin only)
 ├── middlewares/
 │   └── access.py              # subscription/access-level resolution

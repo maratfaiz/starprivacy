@@ -31,7 +31,12 @@ _MEDIA_EXTENSIONS = {
 
 
 def extract_media_ref(message: Message) -> tuple[str, str | None] | None:
-    """Return (content_type, file_id) for the highest-quality media on a message."""
+    """Return (content_type, file_id) for the highest-quality media on a message.
+
+    `file_id` is None for content types that have no downloadable file
+    (location/venue/contact/poll/dice) - callers must skip `download_media`
+    for those and fall back to `describe_non_downloadable` for a text summary.
+    """
     if message.photo:
         return "photo", message.photo[-1].file_id
     if message.video:
@@ -48,6 +53,35 @@ def extract_media_ref(message: Message) -> tuple[str, str | None] | None:
         return "animation", message.animation.file_id
     if message.sticker:
         return "sticker", message.sticker.file_id
+    if message.location:
+        return "location", None
+    if message.venue:
+        return "venue", None
+    if message.contact:
+        return "contact", None
+    if message.poll:
+        return "poll", None
+    if message.dice:
+        return "dice", None
+    return None
+
+
+def describe_non_downloadable(message: Message) -> str | None:
+    """Human-readable summary for a content type with no file and no text/caption."""
+    if message.location:
+        loc = message.location
+        return f"📍 Геолокация: {loc.latitude:.5f}, {loc.longitude:.5f}"
+    if message.venue:
+        venue = message.venue
+        return f"📍 Место: {venue.title}, {venue.address}"
+    if message.contact:
+        contact = message.contact
+        name = " ".join(part for part in (contact.first_name, contact.last_name) if part)
+        return f"👤 Контакт: {name} ({contact.phone_number})"
+    if message.poll:
+        return f"📊 Опрос: {message.poll.question}"
+    if message.dice:
+        return f"🎲 {message.dice.emoji} ({message.dice.value})"
     return None
 
 

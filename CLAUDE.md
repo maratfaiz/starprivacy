@@ -37,14 +37,25 @@ the privacy/legal disclaimer that must stay in sync with actual behavior.
   through this module rather than touching SQLAlchemy sessions directly.
 - `handlers/business.py` — the core feature: `business_connection`, `business_message`,
   `edited_business_message`, `deleted_business_messages` handlers. This is where the "only archive
-  incoming messages, after subscription is active" gating logic lives.
+  incoming messages, after subscription is active" gating logic lives. The trial is granted here
+  too (in `on_business_connection`), not just from `/start`, since an owner can enable the bot
+  straight from Telegram Settings without ever messaging it first.
 - `handlers/subscription.py` — `/subscribe` command, Stars invoice creation, pre-checkout and
-  successful-payment handlers.
-- `handlers/commands.py` — `/start`, `/help`, `/status`.
+  successful-payment handlers. `show_plans()` is the shared body reused by both `/subscribe` and
+  the "💳 Подписка" menu button.
+- `handlers/commands.py` — `/start`, `/menu`, `/help`, `/status`. `build_status_text()` and
+  `build_connections_text()` are shared with `handlers/menu.py` so the menu buttons and their
+  slash-command equivalents always show identical content.
+- `handlers/menu.py` — reply-keyboard button handlers (Профиль/Подписка/Подключения/Помощь); each
+  one just calls the same text-building function its slash-command equivalent uses.
+- `keyboards.py` — the persistent reply-keyboard layout and button-label constants, imported by
+  both `handlers/commands.py` (to attach it) and `handlers/menu.py` (to match taps via `F.text ==`).
 - `handlers/admin.py` — `/stats`, restricted to `config.ADMIN_IDS`.
 - `middlewares/access.py` — resolves whether a business owner currently has usable access
   (admin override vs. active paid subscription vs. none).
-- `utils/media.py` — downloads/caches media (photo/video/voice/document) referenced by a message.
+- `utils/media.py` — downloads/caches media (photo/video/voice/document) referenced by a message,
+  and `describe_non_downloadable()` builds a text summary for content with no file to download
+  (location/venue/contact/poll/dice) so those still get a meaningful archived record.
 - `webapp/` — the Telegram Mini App: `server.py` builds/runs the aiohttp app (started as a background
   task in `main.py`, alongside bot polling), `auth.py` validates Telegram's signed `initData`,
   `api.py` is the JSON API (status/tariffs/subscribe/connections/chats/messages/media), and

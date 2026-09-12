@@ -18,9 +18,10 @@ import logging
 from aiogram import Bot, Router
 from aiogram.types import BusinessConnection, BusinessMessagesDeleted, Message
 
+import config
 from database import db
 from middlewares.access import get_access_level
-from utils.media import download_media, extract_media_ref
+from utils.media import describe_non_downloadable, download_media, extract_media_ref
 
 logger = logging.getLogger(__name__)
 router = Router(name="business")
@@ -44,6 +45,19 @@ async def on_business_connection(connection: BusinessConnection, bot: Bot) -> No
         can_reply=connection.can_reply,
     )
 
+    # The owner may connect the bot straight from Telegram Settings without
+    # ever sending /start first - grant the trial here too, otherwise nothing
+    # ever gets archived (no active access) and the owner sees no reaction at all.
+    trial_note = ""
+    if connection.is_enabled and connection.user.id not in config.ADMIN_IDS:
+        trial = await db.grant_trial_if_eligible(connection.user.id)
+        if trial is not None:
+            trial_note = (
+                f"\n\n🎁 Вам активирован бесплатный пробный период на "
+                f"{config.TRIAL_TARIFF.duration_days} дня — архивирование уже работает.\n"
+                f"Действует до {trial.expires_at:%d.%m.%Y %H:%M} UTC."
+            )
+
     status = "подключено ✅" if connection.is_enabled else "отключено ⛔"
     try:
         await bot.send_message(
@@ -54,7 +68,8 @@ async def on_business_connection(connection: BusinessConnection, bot: Bot) -> No
                 "Проверить тариф — /status."
                 if connection.is_enabled
                 else "Архивирование для этого подключения приостановлено."
-            ),
+            )
+            + trial_note,
         )
     except Exception:
         # The owner may not have started a private chat with the bot yet - non-fatal.
@@ -83,11 +98,16 @@ async def on_business_message(message: Message, bot: Bot) -> None:
     content_type = media_ref[0] if media_ref else "text"
     media_local_path = None
     media_file_id = None
+    text = message.text
     if media_ref is not None:
         content_type, media_file_id = media_ref
-        media_local_path = await download_media(
-            bot, connection_id, message.chat.id, message.message_id, content_type, media_file_id
-        )
+        if media_file_id is not None:
+            media_local_path = await download_media(
+                bot, connection_id, message.chat.id, message.message_id, content_type, media_file_id
+            )
+        else:
+            # location/venue/contact/poll/dice - no file to download, only a summary to store.
+            text = describe_non_downloadable(message)
 
     await db.save_message(
         connection_id=connection_id,
@@ -97,7 +117,7 @@ async def on_business_message(message: Message, bot: Bot) -> None:
         sender_name=_display_name(message),
         is_from_business_owner=False,
         content_type=content_type,
-        text=message.text,
+        text=text,
         caption=message.caption,
         media_file_id=media_file_id,
         media_local_path=media_local_path,

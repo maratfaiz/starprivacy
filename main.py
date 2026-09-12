@@ -17,6 +17,7 @@ import logging
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
+from aiogram.types import BotCommand
 
 import config
 from database.db import init_db
@@ -51,6 +52,15 @@ async def main() -> None:
 
     logger.info("Starting StarPrivacyBot polling loop and Mini App web server")
     await bot.delete_webhook(drop_pending_updates=False)
+    await bot.set_my_commands(
+        [
+            BotCommand(command="start", description="Начало работы и инструкция"),
+            BotCommand(command="menu", description="Показать главное меню"),
+            BotCommand(command="status", description="Профиль и тариф"),
+            BotCommand(command="subscribe", description="Оформить подписку"),
+            BotCommand(command="help", description="Справка"),
+        ]
+    )
     webapp_task = asyncio.create_task(run_webapp(bot))
     try:
         await dispatcher.start_polling(bot, allowed_updates=ALLOWED_UPDATES)

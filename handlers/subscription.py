@@ -34,8 +34,7 @@ def _plans_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
-@router.message(Command("subscribe"))
-async def cmd_subscribe(message: Message) -> None:
+async def show_plans(message: Message) -> None:
     if message.from_user.id in config.ADMIN_IDS:
         await message.answer(
             "У вас уже есть бесплатный доступ администратора — покупать ничего не нужно. 🎉"
@@ -46,6 +45,11 @@ async def cmd_subscribe(message: Message) -> None:
     for tariff in config.TARIFFS.values():
         lines.append(f"• <b>{tariff.title}</b> — {tariff.stars_price}⭐\n  {tariff.description}")
     await message.answer("\n".join(lines), reply_markup=_plans_keyboard())
+
+
+@router.message(Command("subscribe"))
+async def cmd_subscribe(message: Message) -> None:
+    await show_plans(message)
 
 
 @router.callback_query(F.data.startswith("sub:"))
