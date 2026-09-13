@@ -13,6 +13,7 @@ Everything here only ever touches messages that:
 from __future__ import annotations
 
 import datetime as dt
+import html
 import logging
 
 from aiogram import Bot, Router
@@ -20,6 +21,7 @@ from aiogram.types import BusinessConnection, BusinessMessagesDeleted, Message
 
 import config
 from database import db
+from database.models import SavedMessage
 from middlewares.access import get_access_level
 from utils.media import describe_non_downloadable, download_media, extract_media_ref
 
@@ -34,6 +36,17 @@ def _display_name(message: Message) -> str:
     if user.username:
         return f"@{user.username}"
     return user.full_name or str(user.id)
+
+
+def _esc(text: str | None) -> str:
+    """HTML-escape user-supplied text before it goes into an HTML-parsed message.
+
+    The bot's default parse mode is HTML (see main.py); an unescaped '<', '>'
+    or '&' in a customer's message text breaks Telegram's HTML parsing and
+    silently drops the whole notification (send_message raises, and unless
+    the caller wraps it in try/except, nothing reaches the owner at all).
+    """
+    return html.escape(text, quote=False) if text else ""
 
 
 @router.business_connection()
@@ -147,14 +160,27 @@ async def on_edited_business_message(message: Message, bot: Bot) -> None:
     await db.mark_message_edited(connection_id, message.chat.id, message.message_id, previous_text, new_text)
 
     when = message.edit_date or dt.datetime.now(dt.timezone.utc)
-    await bot.send_message(
-        connection.owner_id,
-        (
-            f"✏️ <b>Сообщение отредактировано</b> ({original.sender_name}, {when:%d.%m.%Y %H:%M} UTC)\n\n"
-            f"<b>Было:</b>\n{previous_text or '<i>[без текста]</i>'}\n\n"
-            f"<b>Стало:</b>\n{new_text or '<i>[без текста]</i>'}"
-        ),
-    )
+    previous_display = _esc(previous_text) or "<i>[без текста]</i>"
+    new_display = _esc(new_text) or "<i>[без текста]</i>"
+    try:
+        await bot.send_message(
+            connection.owner_id,
+            (
+                f"✏️ <b>{_esc(original.sender_name)}</b> изменил(а) сообщение "
+                f"({when:%d.%m.%Y %H:%M} UTC):\n\n"
+                f"Было:\n<blockquote>{previous_display}</blockquote>\n"
+                f"Стало:\n<blockquote>{new_display}</blockquote>"
+            ),
+        )
+    except Exception:
+        logger.exception("Failed to notify owner %s about edited message", connection.owner_id)
+
+
+def _deleted_body(msg: SavedMessage) -> str:
+    raw = msg.text or msg.caption
+    if raw:
+        return _esc(raw)
+    return f"<i>[{msg.content_type}]</i>"
 
 
 @router.deleted_business_messages()
@@ -166,15 +192,16 @@ async def on_deleted_business_messages(event: BusinessMessagesDeleted, bot: Bot)
     deleted = await db.mark_messages_deleted(
         event.business_connection_id, event.chat.id, list(event.message_ids)
     )
+    customer_messages = [msg for msg in deleted if not msg.is_from_business_owner]
+    if not customer_messages:
+        return  # Only the owner's own messages were deleted - nothing to alert about.
 
-    for msg in deleted:
-        if msg.is_from_business_owner:
-            continue  # Only alert about the customer's own messages disappearing.
+    sender_label = _esc(customer_messages[0].sender_name)
 
-        body = msg.text or msg.caption or "<i>[без текста]</i>"
-        header = (
-            f"🗑️ <b>Сообщение удалено</b> ({msg.sender_name}, отправлено {msg.sent_at:%d.%m.%Y %H:%M} UTC)"
-        )
+    if len(customer_messages) == 1:
+        msg = customer_messages[0]
+        header = f"🗑️ <b>{sender_label}</b> удалил(а) сообщение (отправлено {msg.sent_at:%d.%m.%Y %H:%M} UTC):"
+        body = f"<blockquote>{_deleted_body(msg)}</blockquote>"
         try:
             if msg.media_local_path and msg.content_type == "photo":
                 from aiogram.types import FSInputFile
@@ -192,3 +219,30 @@ async def on_deleted_business_messages(event: BusinessMessagesDeleted, bot: Bot)
                 await bot.send_message(connection.owner_id, f"{header}\n\n{body}")
         except Exception:
             logger.exception("Failed to notify owner %s about deleted message", connection.owner_id)
+        return
+
+    # Several messages deleted at once - one grouped, collapsible summary instead
+    # of spamming the owner with N separate notifications.
+    entries = "\n".join(
+        f"{msg.sent_at:%d.%m.%Y %H:%M} UTC — {_deleted_body(msg)}" for msg in customer_messages
+    )
+    try:
+        await bot.send_message(
+            connection.owner_id,
+            (
+                f"🗑️ <b>{sender_label}</b> удалил(а) {len(customer_messages)} сообщения(ий):\n\n"
+                f"<blockquote expandable>{entries}</blockquote>"
+            ),
+        )
+        for msg in customer_messages:
+            if not msg.media_local_path:
+                continue
+            from aiogram.types import FSInputFile
+
+            caption = f"📎 медиафайл к сообщению от {msg.sent_at:%d.%m.%Y %H:%M} UTC"
+            if msg.content_type == "photo":
+                await bot.send_photo(connection.owner_id, FSInputFile(msg.media_local_path), caption=caption)
+            else:
+                await bot.send_document(connection.owner_id, FSInputFile(msg.media_local_path), caption=caption)
+    except Exception:
+        logger.exception("Failed to notify owner %s about deleted messages", connection.owner_id)
