@@ -13,6 +13,7 @@ Everything here only ever touches messages that:
 from __future__ import annotations
 
 import datetime as dt
+import html
 import logging
 
 from aiogram import Bot, Router
@@ -34,6 +35,17 @@ def _display_name(message: Message) -> str:
     if user.username:
         return f"@{user.username}"
     return user.full_name or str(user.id)
+
+
+def _esc(text: str | None) -> str:
+    """HTML-escape user-supplied text before it goes into an HTML-parsed message.
+
+    The bot's default parse mode is HTML (see main.py); an unescaped '<', '>'
+    or '&' in a customer's message text breaks Telegram's HTML parsing and
+    silently drops the whole notification (send_message raises, and unless
+    the caller wraps it in try/except, nothing reaches the owner at all).
+    """
+    return html.escape(text, quote=False) if text else ""
 
 
 @router.business_connection()
@@ -147,14 +159,17 @@ async def on_edited_business_message(message: Message, bot: Bot) -> None:
     await db.mark_message_edited(connection_id, message.chat.id, message.message_id, previous_text, new_text)
 
     when = message.edit_date or dt.datetime.now(dt.timezone.utc)
-    await bot.send_message(
-        connection.owner_id,
-        (
-            f"✏️ <b>Сообщение отредактировано</b> ({original.sender_name}, {when:%d.%m.%Y %H:%M} UTC)\n\n"
-            f"<b>Было:</b>\n{previous_text or '<i>[без текста]</i>'}\n\n"
-            f"<b>Стало:</b>\n{new_text or '<i>[без текста]</i>'}"
-        ),
-    )
+    try:
+        await bot.send_message(
+            connection.owner_id,
+            (
+                f"✏️ <b>Сообщение отредактировано</b> ({_esc(original.sender_name)}, {when:%d.%m.%Y %H:%M} UTC)\n\n"
+                f"<b>Было:</b>\n{_esc(previous_text) or '<i>[без текста]</i>'}\n\n"
+                f"<b>Стало:</b>\n{_esc(new_text) or '<i>[без текста]</i>'}"
+            ),
+        )
+    except Exception:
+        logger.exception("Failed to notify owner %s about edited message", connection.owner_id)
 
 
 @router.deleted_business_messages()
@@ -171,9 +186,10 @@ async def on_deleted_business_messages(event: BusinessMessagesDeleted, bot: Bot)
         if msg.is_from_business_owner:
             continue  # Only alert about the customer's own messages disappearing.
 
-        body = msg.text or msg.caption or "<i>[без текста]</i>"
+        raw_body = msg.text or msg.caption
+        body = _esc(raw_body) if raw_body else "<i>[без текста]</i>"
         header = (
-            f"🗑️ <b>Сообщение удалено</b> ({msg.sender_name}, отправлено {msg.sent_at:%d.%m.%Y %H:%M} UTC)"
+            f"🗑️ <b>Сообщение удалено</b> ({_esc(msg.sender_name)}, отправлено {msg.sent_at:%d.%m.%Y %H:%M} UTC)"
         )
         try:
             if msg.media_local_path and msg.content_type == "photo":
